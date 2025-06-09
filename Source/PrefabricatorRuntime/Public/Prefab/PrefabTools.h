@@ -69,6 +69,9 @@ public:
 	static void UnlinkAndDestroyPrefabActor(APrefabActor* PrefabActor);
 	static void GetActorChildren(AActor* InParent, TArray<AActor*>& OutChildren);
 
+	static void GetActorChildrenRecursive(AActor* InParent, TArray<AActor*>& OutChildren);
+	static void BuildHierarchicalActorData(AActor* InParent, APrefabActor* PrefabActor);
+
 	static FBox GetPrefabBounds(AActor* PrefabActor, bool bNonColliding = true);
 	static bool ShouldIgnorePropertySerialization(const FName& PropertyName);
 	static bool ShouldForcePropertySerialization(const FName& PropertyName);
@@ -85,6 +88,7 @@ public:
 private:
 	static void SaveActorState(AActor* InActor, APrefabActor* PrefabActor, const FPrefabActorLookup& CrossReferences, FPrefabricatorActorData& OutActorData);
 	static void LoadActorState(AActor* InActor, const FPrefabricatorActorData& InActorData, const FPrefabLoadSettings& InSettings);
+	static void BuildActorDataRecursive(AActor* InParent, APrefabActor* PrefabActor, TArray<FPrefabricatorActorData>& OutActorData, FPrefabActorLookup& CrossReferences, int32 CurrentDepth);
 
 };
 

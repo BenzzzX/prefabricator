@@ -83,10 +83,26 @@ struct PREFABRICATORRUNTIME_API FPrefabricatorActorData {
 	UPROPERTY()
 	TArray<FPrefabricatorComponentData> Components;
 
+	// 新增：用于保存层级结构的信息
+	UPROPERTY()
+	FGuid ParentPrefabItemID;
+
+	UPROPERTY()
+	TArray<FGuid> ChildrenPrefabItemIDs;
+
+	// 新增：在Prefab内部的层级深度（根为0）
+	UPROPERTY()
+	int32 HierarchyDepth = 0;
+
 #if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	FString ActorName;
 #endif // WITH_EDITORONLY_DATA
+
+	FPrefabricatorActorData()
+	{
+		ParentPrefabItemID.Invalidate();
+	}
 };
 
 struct FPrefabAssetSelectionConfig {
