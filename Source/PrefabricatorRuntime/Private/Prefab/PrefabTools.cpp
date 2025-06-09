@@ -225,6 +225,7 @@ void FPrefabTools::SaveStateToPrefabAsset(APrefabActor* PrefabActor)
 
 	// 使用新的层级保存方法，内部完成所有工作
 	BuildHierarchicalActorData(PrefabActor, PrefabActor);
+	
 	PrefabAsset->Version = (uint32)EPrefabricatorAssetVersion::LatestVersion;
 
 	PrefabActor->PrefabComponent->UpdateBounds();
@@ -709,8 +710,9 @@ void FPrefabTools::BuildActorDataRecursive(AActor* InParent, APrefabActor* Prefa
 		}
 
 
-		BuildActorDataRecursive(ChildActor, PrefabActor, OutActorData, CrossReferences, CurrentDepth + 1);
-
+		if (!ChildActor->IsA<APrefabActor>()) {
+			BuildActorDataRecursive(ChildActor, PrefabActor, OutActorData, CrossReferences, CurrentDepth + 1);
+		}
 
 		FPrefabTools::SaveActorState(ChildActor, PrefabActor, CrossReferences, ActorData);
 	}
@@ -729,10 +731,8 @@ void FPrefabTools::BuildHierarchicalActorData(AActor* InParent, APrefabActor* Pr
 		return;
 	}
 
-	// 内部的CrossReferences，不需要输出
 	FPrefabActorLookup CrossReferences;
 	
-	// 一次递归完成所有工作：构建结构 + CrossReferences + 保存状态
 	BuildActorDataRecursive(InParent, PrefabActor, PrefabAsset->ActorData, CrossReferences, 0);
 }
 
@@ -811,7 +811,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 
 	FPrefabInstanceTemplates* LoadState = FGlobalPrefabInstanceTemplates::Get();
 	TSharedPtr<IPrefabricatorService> Service = FPrefabricatorService::Get();
-
+    
 	TMap<FGuid, AActor*> ActorByItemID;
 	for (AActor* ExistingActor : ExistingActorPool) {
 		if (ExistingActor && ExistingActor->GetRootComponent()) {
@@ -862,7 +862,6 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 						FString RequiredClassName = ActorItemData->ClassPathRef.GetAssetPathString();
 						if (ExistingClassName == RequiredClassName) {
 							// We can reuse this actor
-							ExistingActorPool.Remove(ChildActor);
 							ActorByItemID.Remove(ActorItemData->PrefabItemID);
 						}
 						else {
@@ -880,11 +879,6 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 					CorrectParent = *ParentPtr;
 				}
 			}
-			
-
-
-			// Pre-calculate WorldTransform for new actor spawning
-			FTransform WorldTransform = ActorItemData->RelativeTransform * CorrectParent->GetTransform();
 			
 			if (!ChildActor) {
 				// Create a new child actor.  Try to create it from an existing template actor that is already preset in the scene
@@ -992,9 +986,9 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 	// Hierarchical structure is already correctly established during loading process
 
 	// Destroy the unused actors from the pool (no recursive destroy since children may be reused)
-	for (AActor* UnusedActor : ExistingActorPool) {
-		if (UnusedActor) {
-			UnusedActor->Destroy();
+	for (auto UnusedActor : ActorByItemID) {
+		if (UnusedActor.Value) {
+			UnusedActor.Value->Destroy();
 		}
 	}
 
