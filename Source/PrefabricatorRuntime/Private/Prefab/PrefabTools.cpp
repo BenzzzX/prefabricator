@@ -494,18 +494,14 @@ void FPrefabTools::SaveActorState(AActor* InActor, APrefabActor* PrefabActor, co
 {
 	if (!InActor) return;
 
-	// 计算相对于真正父级的Transform，而不是相对于PrefabActor
+	// Calculate transform relative to actual parent, not relative to PrefabActor
 	AActor* ActualParent = InActor->GetAttachParentActor();
 	FTransform LocalTransform;
 	
 	if (ActualParent && ActualParent != PrefabActor) {
-		// 如果有真正的父级且不是PrefabActor，计算相对于父级的Transform
-		FTransform InverseParentTransform = ActualParent->GetTransform().Inverse();
-		LocalTransform = InActor->GetTransform() * InverseParentTransform;
+		LocalTransform = InActor->GetTransform().GetRelativeTransform(ActualParent->GetTransform());
 	} else {
-		// 如果父级是PrefabActor或没有父级，计算相对于PrefabActor的Transform
-		FTransform InversePrefabTransform = PrefabActor->GetTransform().Inverse();
-		LocalTransform = InActor->GetTransform() * InversePrefabTransform;
+		LocalTransform = InActor->GetTransform().GetRelativeTransform(PrefabActor->GetTransform());
 	}
 	
 	OutActorData.RelativeTransform = LocalTransform;
@@ -660,7 +656,6 @@ void FPrefabTools::GetActorChildrenRecursive(AActor* InParent, TArray<AActor*>& 
 	InParent->GetAttachedActors(OutChildren, true, true);
 }
 
-// 一次递归完成所有工作
 void FPrefabTools::BuildActorDataRecursive(AActor* InParent, APrefabActor* PrefabActor, 
 	TArray<FPrefabricatorActorData>& OutActorData, 
 	FPrefabActorLookup& CrossReferences, 
@@ -671,7 +666,6 @@ void FPrefabTools::BuildActorDataRecursive(AActor* InParent, APrefabActor* Prefa
 		return;
 	}
 
-	// 获取直接子级
 	TArray<AActor*> DirectChildren;
 	InParent->GetAttachedActors(DirectChildren);
 
@@ -682,7 +676,7 @@ void FPrefabTools::BuildActorDataRecursive(AActor* InParent, APrefabActor* Prefa
 			continue;
 		}
 
-		// 1. 设置AssetUserData
+
 		UPrefabricatorAssetUserData* ChildUserData = ChildActor->GetRootComponent()->GetAssetUserData<UPrefabricatorAssetUserData>();
 		FGuid ItemID;
 		if (ChildUserData && ChildUserData->PrefabActor == PrefabActor)
@@ -695,16 +689,16 @@ void FPrefabTools::BuildActorDataRecursive(AActor* InParent, APrefabActor* Prefa
 		}
 		FPrefabTools::AssignAssetUserData(ChildActor, ItemID, PrefabActor);
 
-		// 2. 注册到CrossReferences
+
 		CrossReferences.Register(ChildActor, ItemID);
 
-		// 3. 创建ActorData
+
 		int32 NewItemIndex = OutActorData.AddDefaulted();
 		FPrefabricatorActorData& ActorData = OutActorData[NewItemIndex];
 		ActorData.PrefabItemID = ItemID;
 		ActorData.HierarchyDepth = CurrentDepth;
 
-		// 4. 设置父级ID
+
 		if (InParent != PrefabActor)
 		{
 			UPrefabricatorAssetUserData* ParentUserData = InParent->GetRootComponent()->GetAssetUserData<UPrefabricatorAssetUserData>();
@@ -714,10 +708,10 @@ void FPrefabTools::BuildActorDataRecursive(AActor* InParent, APrefabActor* Prefa
 			}
 		}
 
-		// 5. 递归处理子级（先递归，确保CrossReferences完整）
+
 		BuildActorDataRecursive(ChildActor, PrefabActor, OutActorData, CrossReferences, CurrentDepth + 1);
 
-		// 6. 保存Actor状态（在递归后执行，此时CrossReferences已经完整）
+
 		FPrefabTools::SaveActorState(ChildActor, PrefabActor, CrossReferences, ActorData);
 	}
 }
@@ -811,9 +805,9 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 
 	PrefabActor->GetRootComponent()->SetMobility(PrefabAsset->PrefabMobility);
 
-	// Pool existing child actors that belong to this prefab
+	// Pool existing child actors that belong to this prefab (recursively get all children)
 	TArray<AActor*> ExistingActorPool;
-	GetActorChildren(PrefabActor, ExistingActorPool);
+	PrefabActor->GetAttachedActors(ExistingActorPool, true, true);
 
 	FPrefabInstanceTemplates* LoadState = FGlobalPrefabInstanceTemplates::Get();
 	TSharedPtr<IPrefabricatorService> Service = FPrefabricatorService::Get();
@@ -823,12 +817,8 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 		if (ExistingActor && ExistingActor->GetRootComponent()) {
 			UPrefabricatorAssetUserData* PrefabUserData = ExistingActor->GetRootComponent()->GetAssetUserData<UPrefabricatorAssetUserData>();
 			if (PrefabUserData && PrefabUserData->PrefabActor == PrefabActor) {
-				TArray<AActor*> ChildActors;
-				ExistingActor->GetAttachedActors(ChildActors);
-				if (ChildActors.Num() == 0) {
-					// Only reuse actors that have no children
-					ActorByItemID.Add(PrefabUserData->ItemID, ExistingActor);
-				}
+				// Now supports hierarchical structure, all actors can be reused
+				ActorByItemID.Add(PrefabUserData->ItemID, ExistingActor);
 			}
 		}
 	}
@@ -837,7 +827,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 		UWorld* World = PrefabActor->GetWorld();
 		TMap<FGuid, AActor*> PrefabItemToActorMap;
 
-		// 按层级深度排序，确保父级先于子级创建
+		// Sort by hierarchy depth to ensure parents are created before children
 		TArray<FPrefabricatorActorData*> SortedActorData;
 		for (FPrefabricatorActorData& ActorItemData : PrefabAsset->ActorData) {
 			SortedActorData.Add(&ActorItemData);
@@ -882,16 +872,18 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 				}
 			}
 
-			// 确定正确的父级Actor
-			AActor* CorrectParent = PrefabActor;  // 默认父级是PrefabActor
+			// Determine correct parent actor
+			AActor* CorrectParent = PrefabActor;  // Default parent is PrefabActor
 			if (ActorItemData->ParentPrefabItemID.IsValid()) {
 				AActor** ParentPtr = PrefabItemToActorMap.Find(ActorItemData->ParentPrefabItemID);
 				if (ParentPtr && *ParentPtr) {
 					CorrectParent = *ParentPtr;
 				}
 			}
+			
 
-			// 计算相对于正确父级的WorldTransform
+
+			// Pre-calculate WorldTransform for new actor spawning
 			FTransform WorldTransform = ActorItemData->RelativeTransform * CorrectParent->GetTransform();
 			
 			if (!ChildActor) {
@@ -901,10 +893,18 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 					Template = LoadState->GetTemplate(ActorItemData->PrefabItemID, PrefabAsset->LastUpdateID);
 				}
 
-				ChildActor = Service->SpawnActor(ActorClass, WorldTransform, PrefabActor->GetLevel(), Template);
+				ChildActor = Service->SpawnActor(ActorClass, FTransform::Identity, PrefabActor->GetLevel(), Template);
 
-				// 直接parent到正确的父级
+		
 				ParentActors(CorrectParent, ChildActor);
+				
+
+				if (ChildActor->GetRootComponent()) {
+					EComponentMobility::Type OldChildMobility = ChildActor->GetRootComponent()->Mobility;
+					ChildActor->GetRootComponent()->SetMobility(EComponentMobility::Movable);
+					ChildActor->GetRootComponent()->SetRelativeTransform(ActorItemData->RelativeTransform);
+					ChildActor->GetRootComponent()->SetMobility(OldChildMobility);
+				}
 
 				if (Template == nullptr || bPrefabOutOfDate) {
 					// We couldn't use a template,  so load the prefab properties in
@@ -917,17 +917,28 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 				}
 			}
 			else {
-				// This actor was reused.  re-parent it to the correct parent
-				ChildActor->DetachFromActor(FDetachmentTransformRules(EDetachmentRule::KeepWorld, true));
-				ParentActors(CorrectParent, ChildActor);
-
-				// Update the world transform
-				if (ChildActor->GetRootComponent()) {
-					EComponentMobility::Type OldChildMobility = ChildActor->GetRootComponent()->Mobility;
-					ChildActor->GetRootComponent()->SetMobility(EComponentMobility::Movable);
-					ChildActor->SetActorTransform(WorldTransform);
-					ChildActor->GetRootComponent()->SetMobility(OldChildMobility);
+				// This actor was reused. Check if we need to change parent
+				AActor* CurrentParent = ChildActor->GetAttachParentActor();
+				
+				// Re-parent if needed
+				if (CurrentParent != CorrectParent) {
+	
+					ChildActor->DetachFromActor(FDetachmentTransformRules(EDetachmentRule::KeepWorld, true));
+					ParentActors(CorrectParent, ChildActor);
 				}
+				
+
+				if (ChildActor->GetRootComponent()) {
+					FTransform CurrentRelativeTransform = ChildActor->GetRootComponent()->GetRelativeTransform();
+					if (!CurrentRelativeTransform.Equals(ActorItemData->RelativeTransform, 0.001f)) {
+						EComponentMobility::Type OldChildMobility = ChildActor->GetRootComponent()->Mobility;
+						ChildActor->GetRootComponent()->SetMobility(EComponentMobility::Movable);
+						ChildActor->GetRootComponent()->SetRelativeTransform(ActorItemData->RelativeTransform);
+						ChildActor->GetRootComponent()->SetMobility(OldChildMobility);
+					}
+				}
+				
+				// Reused actors don't need property updates (prefab not outdated, properties should be correct)
 			}
 
 			AssignAssetUserData(ChildActor, ActorItemData->PrefabItemID, PrefabActor);
@@ -978,11 +989,13 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 
 	}
 
-	// 层级结构已经在加载过程中正确建立，不需要额外的重建步骤
+	// Hierarchical structure is already correctly established during loading process
 
-	// Destroy the unused actors from the pool
+	// Destroy the unused actors from the pool (no recursive destroy since children may be reused)
 	for (AActor* UnusedActor : ExistingActorPool) {
-		DestroyActorTree(UnusedActor);
+		if (UnusedActor) {
+			UnusedActor->Destroy();
+		}
 	}
 
 	PrefabActor->LastUpdateID = PrefabAsset->LastUpdateID;
