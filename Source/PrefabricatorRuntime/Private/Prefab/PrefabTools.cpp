@@ -1102,6 +1102,7 @@ void FPrefabInstanceTemplates::RegisterTemplate(const FGuid& InPrefabItemId, FGu
 	FPrefabInstanceTemplateInfo& TemplateRef = PrefabItemTemplates.FindOrAdd(InPrefabItemId);
 	TemplateRef.TemplatePtr = InActor;
 	TemplateRef.PrefabLastUpdateId = InPrefabLastUpdateId;
+    RegisteredActors.Add(InActor);
 }
 
 AActor* FPrefabInstanceTemplates::GetTemplate(const FGuid& InPrefabItemId, FGuid InPrefabLastUpdateId)
@@ -1119,11 +1120,27 @@ AActor* FPrefabInstanceTemplates::GetTemplate(const FGuid& InPrefabItemId, FGuid
 	// Remove from the map if the actor state is stale
 	if (!Actor) {
 		PrefabItemTemplates.Remove(InPrefabItemId);
+	    RegisteredActors.Remove(Actor);
 	}
 
 	return Actor;
 }
 
+void FPrefabInstanceTemplates::OnObjectPropertyChanged(UObject* ModifiedObject, struct FPropertyChangedEvent& Event)
+{
+    auto* Actor = ModifiedObject->GetTypedOuter<AActor>();
+    if (!Actor) return;
+    if (RegisteredActors.Contains(Actor)) {
+        // If the actor is registered, we need to remove it from the template map
+        for (auto It = PrefabItemTemplates.CreateIterator(); It; ++It) {
+            if (It->Value.TemplatePtr.Get() == Actor) {
+                It.RemoveCurrent();
+                break;
+            }
+        }
+        RegisteredActors.Remove(Actor);
+    }
+}
 
 ///////////////////////////////// FPrefabSaveModeCrossReferences ///////////////////////////////// 
 

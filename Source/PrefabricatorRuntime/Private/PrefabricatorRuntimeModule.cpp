@@ -10,6 +10,8 @@ class FPrefabricatorRuntime : public IPrefabricatorRuntime
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
+
+    FDelegateHandle ObjectPropertyChangedHandle;
 };
 
 IMPLEMENT_MODULE(FPrefabricatorRuntime, PrefabricatorRuntime)
@@ -23,6 +25,8 @@ void FPrefabricatorRuntime::StartupModule()
 	}
 
 	FGlobalPrefabInstanceTemplates::_CreateSingleton();
+
+    ObjectPropertyChangedHandle = FCoreUObjectDelegates::OnObjectPropertyChanged.AddRaw(FGlobalPrefabInstanceTemplates::Get(), &FPrefabInstanceTemplates::OnObjectPropertyChanged);
 }
 
 
@@ -30,6 +34,8 @@ void FPrefabricatorRuntime::ShutdownModule()
 {
 	// Clear the service object
 	FPrefabricatorService::Set(nullptr);
+
+    FCoreUObjectDelegates::OnObjectPropertyChanged.Remove(ObjectPropertyChangedHandle);
 
 	FGlobalPrefabInstanceTemplates::_ReleaseSingleton();
 }

@@ -28,9 +28,11 @@ class PREFABRICATORRUNTIME_API FPrefabInstanceTemplates {
 public:
 	void RegisterTemplate(const FGuid& InPrefabItemId, FGuid InPrefabLastUpdateId, AActor* InActor);
 	AActor* GetTemplate(const FGuid& InPrefabItemId, FGuid InPrefabLastUpdateId);
+    void OnObjectPropertyChanged(UObject* ModifiedObject, struct FPropertyChangedEvent&);
 
 private:
 	TMap<FGuid, FPrefabInstanceTemplateInfo> PrefabItemTemplates;
+    TSet<TWeakObjectPtr<AActor>> RegisteredActors;
 };
 
 class PREFABRICATORRUNTIME_API FGlobalPrefabInstanceTemplates {
