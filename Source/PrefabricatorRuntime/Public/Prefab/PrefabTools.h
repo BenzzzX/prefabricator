@@ -12,6 +12,7 @@ struct FRandomStream;
 
 struct PREFABRICATORRUNTIME_API FPrefabLoadSettings {
 	bool bUnregisterComponentsBeforeLoading = true;
+    bool bDestroyUnusedActors = true;
 	bool bRandomizeNestedSeed = false;
 	bool bSynchronousBuild = true;
 	bool bCanLoadFromCachedTemplate = true;

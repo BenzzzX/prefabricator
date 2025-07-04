@@ -1003,15 +1003,16 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 		}
 
 	}
-
-	// Hierarchical structure is already correctly established during loading process
-
-	// Destroy the unused actors from the pool (no recursive destroy since children may be reused)
-	for (auto UnusedActor : ActorByItemID) {
-		if (UnusedActor.Value) {
-			UnusedActor.Value->Destroy();
-		}
-	}
+    
+    if (InSettings.bDestroyUnusedActors)
+    {
+        // Destroy the unused actors from the pool (no recursive destroy since children may be reused)
+        for (auto UnusedActor : ActorByItemID) {
+            if (UnusedActor.Value) {
+                UnusedActor.Value->Destroy();
+            }
+        }
+    }
 
 	PrefabActor->LastUpdateID = PrefabAsset->LastUpdateID;
 

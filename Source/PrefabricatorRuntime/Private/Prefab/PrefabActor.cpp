@@ -89,6 +89,7 @@ void APrefabActor::PostDuplicate(EDuplicateMode::Type DuplicateMode)
 
 		FPrefabLoadSettings LoadSettings;
 		LoadSettings.bRandomizeNestedSeed = true;
+	    LoadSettings.bDestroyUnusedActors = false; // Don't destroy existing actors on duplicate
 		LoadSettings.Random = &Random;
 		FPrefabTools::LoadStateFromPrefabAsset(this, LoadSettings);
 	}
