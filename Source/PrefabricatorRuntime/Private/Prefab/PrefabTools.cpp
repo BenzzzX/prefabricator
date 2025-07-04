@@ -816,9 +816,30 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 	for (AActor* ExistingActor : ExistingActorPool) {
 		if (ExistingActor && ExistingActor->GetRootComponent()) {
 			UPrefabricatorAssetUserData* PrefabUserData = ExistingActor->GetRootComponent()->GetAssetUserData<UPrefabricatorAssetUserData>();
-			if (PrefabUserData && PrefabUserData->PrefabActor == PrefabActor) {
-				// Now supports hierarchical structure, all actors can be reused
-				ActorByItemID.Add(PrefabUserData->ItemID, ExistingActor);
+			if (PrefabUserData) {
+			    if (PrefabUserData->PrefabActor == PrefabActor)
+			    {
+				    ActorByItemID.Add(PrefabUserData->ItemID, ExistingActor);
+			    }
+			    // If no cached parent, fallback to finding the parent prefab actor in the hierarchy
+			    // This could happen if the prefab is move/paste to a different level
+			    else if (!PrefabUserData->PrefabActor.IsValid())
+			    {
+			        auto ParentActor = ExistingActor->GetAttachParentActor();
+			        while (ParentActor)
+			        {
+			            if (APrefabActor* ParentPrefab = Cast<APrefabActor>(ParentActor))
+                        {
+                            if (ParentPrefab == PrefabActor)
+                            {
+                                PrefabUserData->PrefabActor = ParentPrefab;
+                                ActorByItemID.Add(PrefabUserData->ItemID, ExistingActor);
+                            }
+                            break;
+                        }
+			            ParentActor = ParentActor->GetAttachParentActor();
+			        }
+                }
 			}
 		}
 	}
