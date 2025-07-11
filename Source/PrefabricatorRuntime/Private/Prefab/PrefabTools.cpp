@@ -1148,6 +1148,7 @@ AActor* FPrefabInstanceTemplates::GetTemplate(const FGuid& InPrefabItemId, FGuid
 	return Actor;
 }
 
+#if WITH_EDITOR
 void FPrefabInstanceTemplates::OnObjectPropertyChanged(UObject* ModifiedObject, struct FPropertyChangedEvent& Event)
 {
     auto* Actor = ModifiedObject->GetTypedOuter<AActor>();
@@ -1163,6 +1164,7 @@ void FPrefabInstanceTemplates::OnObjectPropertyChanged(UObject* ModifiedObject, 
         RegisteredActors.Remove(Actor);
     }
 }
+#endif // WITH_EDITOR
 
 ///////////////////////////////// FPrefabSaveModeCrossReferences ///////////////////////////////// 
 

@@ -25,8 +25,10 @@ void FPrefabricatorRuntime::StartupModule()
 	}
 
 	FGlobalPrefabInstanceTemplates::_CreateSingleton();
-
+    
+#if WITH_EDITOR
     ObjectPropertyChangedHandle = FCoreUObjectDelegates::OnObjectPropertyChanged.AddRaw(FGlobalPrefabInstanceTemplates::Get(), &FPrefabInstanceTemplates::OnObjectPropertyChanged);
+#endif
 }
 
 
@@ -35,7 +37,9 @@ void FPrefabricatorRuntime::ShutdownModule()
 	// Clear the service object
 	FPrefabricatorService::Set(nullptr);
 
+#if WITH_EDITOR
     FCoreUObjectDelegates::OnObjectPropertyChanged.Remove(ObjectPropertyChangedHandle);
+#endif
 
 	FGlobalPrefabInstanceTemplates::_ReleaseSingleton();
 }

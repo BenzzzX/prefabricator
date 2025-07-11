@@ -29,7 +29,9 @@ class PREFABRICATORRUNTIME_API FPrefabInstanceTemplates {
 public:
 	void RegisterTemplate(const FGuid& InPrefabItemId, FGuid InPrefabLastUpdateId, AActor* InActor);
 	AActor* GetTemplate(const FGuid& InPrefabItemId, FGuid InPrefabLastUpdateId);
+#if WITH_EDITOR
     void OnObjectPropertyChanged(UObject* ModifiedObject, struct FPropertyChangedEvent&);
+#endif
 
 private:
 	TMap<FGuid, FPrefabInstanceTemplateInfo> PrefabItemTemplates;
